@@ -1,6 +1,8 @@
-custom_ls: custom_ls.c
-	gcc -Wall -pedantic -o custom_ls custom_ls.c
+LIBDIR=/usr/lib
 
-.PHONY: clean
-clean:
-	rm -f custom_ls
+
+
+install:
+
+	cc -Wall -Werror -Wextra custom_ls.c
+
