@@ -12,9 +12,7 @@ int main(int argc, char **argv)
     //struct dirent *readdir(DIR *dirp);
     struct dirent *entry;
     
-    int v;
-    const char *str1 = "-l";    
-    v = strcmp(str1, argv[1]);
+
 
     if (argc > 2) 
     {
@@ -23,7 +21,7 @@ int main(int argc, char **argv)
     }
   
   
-   if (argc == 1 || v == 0)
+   if (argc == 1)
    {
   	folder = opendir(".");
    } 
