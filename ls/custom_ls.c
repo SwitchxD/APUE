@@ -13,7 +13,6 @@ int main(int argc, char **argv)
     struct dirent *entry;
     
 
-
     if (argc > 2) 
     {
 	fprintf(stderr, "usage: %s dir_name\n", argv[0]);
@@ -30,8 +29,12 @@ int main(int argc, char **argv)
 	folder = opendir(argv[1]);
    }
 
-    while( (entry=readdir(folder)) )
+    while( (entry=readdir(folder)) != NULL )
     {
+    	if (entry->d_name[0] == '.')
+    	{
+    	continue;
+    	}
         printf("%s\n",entry->d_name);
     }
 
