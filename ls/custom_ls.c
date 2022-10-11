@@ -1,175 +1,247 @@
-#include <unistd.h>
-#include <stdlib.h>
-#include <stdio.h>
-#include <unistd.h>
-#include <dirent.h>
-#include <limits.h> 
-#include <errno.h>
-#include <string.h> 
-#include <sys/stat.h>
-#include <pwd.h>
-#include <time.h>
-#include <libgen.h>
-#include <sys/types.h>
-#include <grp.h>
 #include "custom_ls.h"
-//main function    
-int main(int argc, char *argv[]) {
-    //initialize flags
-    int a_flag = 0; 
-    int b_flag = 0; 
-    int c_flag = 0; 
+#define MAX 100
 
-    //get options 
-    int opt; 
-    while((opt = getopt(argc, argv, "al")) != -1) {
-        switch (opt) {
-        case 'l':   
-            a_flag = 1; 
-            break;
-        case 'a':
-            b_flag = 1; 
-            break;
-        default:
-            fprintf(stderr, "ls: supports -l and -a options\n"); 
-            exit(EXIT_FAILURE); 
-        }
-    }
+int number_of_paths;
+char *path_default = "/bin:.";
+char ** actual_path;
 
-    //check command line args and call print_args with appropriate parameters 
-    if(optind == argc) {
-        print_args(".", "NULL", b_flag, a_flag, c_flag);
-        if(a_flag == 0) {
-            printf("\n");
-        }
-    }else{
-        while(optind < argc) {
-            struct stat argbuf;
-            char *arg = argv[optind]; 
-            if((stat(arg, &argbuf)) == -1) {
-                printf("ls: cannot access '%s': No such file or directory\n", argv[optind]);
-            }else{
-                if(S_ISREG(argbuf.st_mode)) {
-                    c_flag = 1;
-                    print_args(".", arg, b_flag, a_flag, c_flag); 
-                }
-                if(S_ISDIR(argbuf.st_mode)) {
-                    printf("%s:\n", arg); 
-                    print_args(arg, "NULL", b_flag, a_flag, c_flag); 
-                }
-                c_flag = 0;
-                if(optind < argc-1) {
-                    printf("\n"); 
-                }
-                if(a_flag == 0) {
-                    printf("\n");
-                }
-            }
-            optind ++; 
-        }    
+
+int main(int argc,char * argv[])
+{
+  getting_path();
+  char input[MAX];
+  char **inputlist;
+  int size;
+  int itr=0;
+  while(itr<1){
+    strcpy(input,"ls ");
+    if(argc==1){
+      strcpy(input,"ls");
     }
+    for(int i=1;i<argc;i++){
+        strcat(input,argv[i]);
+        if(i!=argc-1)
+            strcat(input," ");
+    }
+    size = converting_array(input, " ", &inputlist);
+    handling_command(inputlist[0], inputlist+1, size-1);
+    freeing_array(inputlist, size);
+    itr++;
+  }
+  freeing_array(actual_path, number_of_paths);
+  return 0;
 }
-
-//function to print file/directory data with ls option -l
-void for_option_l_print(char *arguments_of_directory, struct dirent *entry_for_directory) {
-    struct stat buffer_of_stats; 
-    char file_path[PATH_MAX];
-    sprintf(file_path, "%s/%s", arguments_of_directory, entry_for_directory->d_name);
-    if(stat(file_path, &buffer_of_stats) == -1) {
-        perror("stat");
-        return;   
-    }
-
-    //permission data/nlink 
-    printf((S_ISDIR(buffer_of_stats.st_mode)) ? "d" : "-"); 
-    printf((buffer_of_stats.st_mode & S_IRUSR) ? "r" : "-");
-    printf((buffer_of_stats.st_mode & S_IWUSR) ? "w" : "-");
-    printf((buffer_of_stats.st_mode & S_IXUSR) ? "x" : "-");
-    printf((buffer_of_stats.st_mode & S_IRGRP) ? "r" : "-");
-    printf((buffer_of_stats.st_mode & S_IWGRP) ? "w" : "-");
-    printf((buffer_of_stats.st_mode & S_IXGRP) ? "x" : "-");
-    printf((buffer_of_stats.st_mode & S_IROTH) ? "r" : "-");
-    printf((buffer_of_stats.st_mode & S_IWOTH) ? "w" : "-");
-    printf((buffer_of_stats.st_mode & S_IXOTH) ? "x " : "- ");
-    printf("%li ", buffer_of_stats.st_nlink);
-
-    //group and user data 
-    struct passwd *my_passwd; 
-    struct group *my_groupid; 
-    my_passwd = getpwuid(buffer_of_stats.st_uid);  
-    if(my_passwd == NULL) {
-        perror("getpwuid"); 
-        printf("%d ", buffer_of_stats.st_uid); 
-    }else {
-        printf("%s ", my_passwd->pw_name); 
-    }
-    my_groupid = getgrgid(buffer_of_stats.st_gid);
-    if(my_groupid == NULL) {
-        perror("getpwuid"); 
-        printf("%d ", buffer_of_stats.st_gid); 
-    }else  {
-        printf("%s ", my_groupid->gr_name); 
-    }
-
-    //file size
-    printf("%5ld ", buffer_of_stats.st_size);
-
-    //timestamp
-    struct tm *time_stamp;
-    char outstr[200];
-    time_t t = buffer_of_stats.st_mtime;
-    time_stamp = localtime(&t);   
-    if(time_stamp == NULL) {
-        perror("localtime"); 
-        exit(EXIT_FAILURE);
-    } 
-    strftime(outstr, sizeof(outstr), "%b %d %R", time_stamp); 
-    printf("%s ", outstr);
-
-    //file name 
-    printf("%s\n", entry_for_directory->d_name); 
+int converting_array(char *str, char *sep, char *** list)
+{
+  int len = strlen(str);
+  char *copystr = (char *) malloc((len + 1) * sizeof(char));
+  strcpy(copystr, str);
+  int sizelist = 0;
+  char *cur, *temp;
+  temp = copystr;
+  while( ( cur = strsep(&temp, sep) ) )
+  {
+    sizelist++;
+  }
+  (*list) = (char **) malloc(sizelist * sizeof(char*));
+  int i = 0;
+  int curlen;
+  strcpy(copystr, str);
+  temp = copystr;
+  while( ( cur = strsep(&temp, sep) ) )
+  {
+    curlen = strlen(cur);
+    (*list)[i] = (char *) malloc((curlen + 1) * sizeof(char));
+    strcpy((*list)[i], cur);
+    i++;
+  }
+  free(copystr);
+  return sizelist;
 }
-
-//function to check flags and print file/directory info accordingly
-void handling_flag(char *arguments_of_directory, struct dirent *entry_for_directory, int flag_all, int long_flag) {
-    if(flag_all == 0){
-        if((entry_for_directory->d_name[0] == '.')) { 
-            return; 
-        } 
-    }
-    if(long_flag == 0) {
-        printf("%s ", entry_for_directory->d_name);
-    }else { 
-        for_option_l_print(arguments_of_directory, entry_for_directory);
-    }
+void freeing_array(char ** list, int size)
+{
+  int i;
+  for(i = 0; i<size; i++)
+  {
+    free(list[i]);
+  }
+  free(list);
 }
-
-//function to handle cmd-line args
-void print_args(char *arguments_of_directory, char *file, int all_flags, int long_flags, int file_flags) {
-    //open directory
-    DIR *dir = opendir(arguments_of_directory);
-    if(dir == NULL) {
-        perror("opendir"); 
-        exit(EXIT_FAILURE);
-    } 
-
-    //read and print directory/file data 
-    struct dirent *dir_entry;  
-    errno = 0; 
-    while((dir_entry = readdir(dir))!= NULL) { 
-        if(file_flags == 1) {
-            if(strcmp(dir_entry->d_name, file) == 0) {
-                handling_flag(arguments_of_directory, dir_entry, all_flags, long_flags);
-            }
-        }else {
-            handling_flag(arguments_of_directory, dir_entry, all_flags, long_flags); 
-        }
+void printing_array(char **list, int size)
+{
+  int i;
+  for(i = 0; i<size; i++)
+  {
+    printf("%s\n",list[i]);
+  }
+}
+void getting_path()
+{
+  char *mypath = getenv("THEPATH");
+  if(mypath == NULL)
+    mypath = path_default;
+  //printf("($THEPATH) is %s\n",mypath);
+  number_of_paths = converting_array(mypath, ":", &actual_path);
+}
+void readline(char *input)
+{
+  scanf("%[^\n]", input);
+  getchar();
+}
+int checking_implementing(char *filepath)
+{
+  struct stat buf;
+  int rc = lstat(filepath, &buf );
+  if(rc < 0)
+    return 0;
+  if ( S_ISREG( buf.st_mode ) )
+  {
+    if ( buf.st_mode & ( S_IXUSR | S_IXGRP | S_IXOTH ) )
+    {
+      return 1;
     }
-    if((dir_entry == NULL) && (errno != 0)) {
-        perror("readdir");
-        exit(EXIT_FAILURE); 
+  }
+
+  return 0;
+}
+int finding_path(char *cmd, char *filepath)
+{
+  int i;
+  char cur[MAX];
+  for(i=0; i<number_of_paths; i++)
+  {
+    strcpy(cur,actual_path[i]);
+    strcat(cur,"/");
+    strcat(cur,cmd);
+    if(checking_implementing(cur)){
+      strcpy(filepath,cur);
+      return 1;
     }
-    
-    //close directory
-    closedir(dir);
+  }
+  return 0;
+}
+int posting_array(char * str, char ** list, int size)
+{
+  int i;
+  for(i = 0; i<size; i++)
+  {
+    if( strcmp(list[i],str)==0 )
+      return i;
+  }
+  return -1;
+}
+void executing_path(int argslen, char * cmd, char ** args, char * filepath)
+{
+  switch(argslen){
+    case 0:
+      execlp(filepath, cmd, NULL); break;
+    case 1:
+      execlp(filepath, cmd, args[0], NULL); break;
+    case 2:
+      execlp(filepath, cmd, args[0], args[1], NULL); break;
+    case 3:
+      execlp(filepath, cmd, args[0], args[1], args[2], NULL); break;
+    case 4:
+      execlp(filepath, cmd, args[0], args[1], args[2], args[3], NULL); break;
+  }
+  perror( "execlp() failed!" );
+  exit(EXIT_FAILURE);
+}
+void redirfd(int redirfd, char *pathname, int flags, mode_t mode)
+{
+  int fd;
+  if((int)mode == -1){
+    fd = open(pathname, flags);
+  }
+  else{
+    fd = open(pathname, flags , mode);
+  }
+  if( fd < 0 )
+  {
+    perror("ERROR: Failed to operate file\n");
+    exit(-1);
+  }
+  if((dup2(fd, redirfd) == -1))
+  {
+    perror("ERROR: Failed to redirect file descriptor\n");
+    exit(-1);
+  }
+}
+void child(int argslen, char * cmd, char ** args, char * filepath)
+{
+  int pos, cmdlen;
+  cmdlen = argslen;
+  if( (pos = posting_array("==>", args, argslen)) != -1 )
+  {
+    cmdlen = pos;
+    redirfd(1, args[pos+1], O_WRONLY | O_CREAT | O_TRUNC , 0664);
+  }
+  else if( (pos = posting_array("<==", args, argslen)) != -1 )
+  {
+    cmdlen = pos;
+    redirfd(0, args[pos+1], O_RDONLY, -1);
+  }
+  else if( (pos = posting_array("-->", args, argslen)) != -1 )
+  {
+    cmdlen = pos;
+    redirfd(1, args[pos+1], O_WRONLY | O_CREAT | O_APPEND , 0664);
+  }
+  executing_path(cmdlen, cmd, args, filepath);
+}
+int verifyampersand(char ** inputlist, int size){
+  int i;
+  for(i = 0; i< size-1; i++){
+    if(strcmp(inputlist[i], "&")==0){
+      return -1;
+    }
+  }
+  if(strcmp(inputlist[size-1], "&")==0)
+    return 1;
+  return 0;
+}
+void executing_command(char *cmd, char **args, int argslen, char *filepath)
+{
+  int ampersand = verifyampersand(args, argslen);
+  if(ampersand == -1){
+    printf("ERROR: & Must be at the end of command\n");
+  }
+  int pid = fork();
+  if(pid < 0){
+    perror( "fork() failed!" );
+    exit(EXIT_FAILURE);
+  }
+  else if( pid == 0 ){
+    if(ampersand == 1)
+      child(argslen-1, cmd, args, filepath);
+    else
+      child(argslen, cmd, args, filepath);
+  }
+  else{
+    if(ampersand != 1){
+      int status;
+      wait( &status );
+    }
+    else{
+      printf("[process running in background with pid %d]\n",pid);
+    }
+  }
+}
+void handling_command(char *cmd, char **args, int argslen)
+{
+  char filepath[MAX];
+  if(strcmp(cmd,"cd")==0){
+    if(chdir(args[0])!=0){
+      printf("cd: %s: No such file or directory\n", cmd);
+    }
+  }
+  else if(finding_path(cmd, filepath)){
+    executing_command(cmd, args, argslen, filepath);
+  }
+  else if( (strcmp(cmd, "quit")==0 || strcmp(cmd, "exit")==0) && argslen == 0){
+    printf("bye\n");
+    exit(EXIT_SUCCESS);
+  }
+  else{
+    printf("ERROR: command '%s' not found.\n", cmd);
+  }
 }
