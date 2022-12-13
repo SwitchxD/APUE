@@ -1,0 +1,9 @@
+This project will clarify how to start a new process for the sole purpose of sending a signal at a later time. 
+
+Write a program that will simulate an alarm clock using fork, sleep, and signal functions. 
+
+The child process will wait for 5 seconds before sending a SIGALRM signal to its parent.
+
+Have the parent process catch the SIGALRM with a call to signal.
+
+When the alarm sounds, print out “Ding!”
